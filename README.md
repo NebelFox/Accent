@@ -1,5 +1,6 @@
 # Accent
-Android application for studying accents in the Ukrainian language. Made with Corona SDK (now Solar 2D). The list of words is currently outdated.
+Android application for studying accents in the Ukrainian language. Made with Corona SDK (now Solar 2D).
+The list of words is currently outdated as it is from 2020 and most likely now it has some changes.
 
 ## Progress
 It divides into 2 parts:
