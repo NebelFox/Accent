@@ -1,4 +1,4 @@
-local composer = require( "composer" )
+local composer = require "composer"
 
 local scene = composer.newScene()
 
@@ -6,11 +6,11 @@ local scene = composer.newScene()
 local json = require "json"
 local rand = math.random
 
-local mngpath = "packages."
-local progress = require ( mngpath .. "progressmanager" )
-local theme = require ( mngpath .. "thememanager" )
-local settings = require ( mngpath .. "settingsmanager" )
-local widgets = require "packages.widgets"
+local packagesPath = "packages."
+local progress = require ( packagesPath .. "progressmanager" )
+local theme    = require ( packagesPath .. "thememanager" )
+local settings = require ( packagesPath .. "settingsmanager" )
+local widgets  = require ( packagesPath .. "widgets" )
 
 -- -----------------------------------------------------------------------------------
 -- Code outside of the scene event functions below will only be executed ONCE unless
@@ -29,86 +29,83 @@ function scene:create( event )
 
 	local sceneGroup = self.view
 	-- Code here runs when the scene is first created but has not yet appeared on screen
-	local words = json.decodeFile ( system.pathForFile ( "data/wordlist_readable.json", system.ResourceDirectory ) )
-	local wordsLen = #words
-	print ( wordsLen )
+	local words = json.decodeFile ( system.pathForFile ( "data/wordlist.json", system.ResourceDirectory ) )
+	local wordsCount = #words
+	local currentWordIndex = wordsCount
 
 	settings.loadData ()
 	theme.loadData ()
 	progress.loadData ()
 
-	local whichTheme = settings.get ( "currentTheme" )
+	local currentThemeIndex = settings.get ( "currentTheme" )
 
-	widgets:setTheme ( theme.get ( whichTheme ) )
+	widgets:setTheme ( theme.get ( currentThemeIndex ) )
 	widgets:init ( sceneGroup )
 
-	local len = #words
-	local index = len
 
 	local word
 	local progressView
 	local toggleButton
+	local score
+	local progressView
 
 	local isVibrationAllowed = settings.get ( "isVibrationAllowed" )
 
-	local total = 0
-	local right = 0
+	local totalAnswersCount = 0
+	local correctAnswersCount = 0
 
 	local function shuffle ()
-		for i=len, 1, -1 do
+		for i=wordsCount, 1, -1 do
 			local j = rand ( i )
 			words[i], words[j] = words[j], words[i]
 		end
 	end
 
-	local function randWord ()
-		if index == len then
+	local function getNextWord ()
+		if currentWordIndex == wordsCount then
 			shuffle ()
-			index = 0
+			currentWordIndex = 0
 		end
-		index = index + 1
-		local word = words[index]
+		currentWordIndex = currentWordIndex + 1
+		local word = words[currentWordIndex]
 		return word
 	end
 
-	local function newWord ()
-		local w = randWord ()
+	local function nextWord ()
+		local w = getNextWord ()
 		word = widgets.word.new ( w )
 		word:appear ()
 		timer.performWithDelay ( word.effectTime + 10, function () toggleButton:enable ( "newWord_function" ) end, 1 )
 	end
 
-	local score
-	local progressView
-
 	local function check ( event )
-		if event.right then
-			right = right + 1
-			timer.performWithDelay ( word.effectTime + 10, newWord, 1 )
+		if event.correct then
+			correctAnswersCount = correctAnswersCount + 1
+			timer.performWithDelay ( word.effectTime + 10, nextWord, 1 )
 			word:disappear ()
 			toggleButton:disable ( "check_function" )
 			score:add ()
 		else
 			if isVibrationAllowed then system.vibrate () end
 		end
-		total = total + 1
+		totalAnswersCount = totalAnswersCount + 1
 	end
 
 	local function toTrain ()
-		index = len
+		currentWordIndex = wordsCount
 		toggleButton:disable ( "toTrain_function" )
 		progressView:disappear ()
 		score = widgets.wordsCounter ()
-		timer.performWithDelay ( 600, newWord, 1 )
+		timer.performWithDelay ( 600, nextWord, 1 )
 	end
 
 	local function toMenu ()
 		word:disappear ()
 		score:disappear ()
-		if total > 0 then
-			progress.progress ( total, right )
+		if totalAnswersCount > 0 then
+			progress.progress ( totalAnswersCount, correctAnswersCount )
 		end
-		total, right = 0, 0
+		totalAnswersCount, rightAnswersCount = 0, 0
 		progressView = widgets.progressView ( progress.getProgress () )
 	end
 
@@ -130,13 +127,13 @@ function scene:create( event )
 
 	-- -----------------------------------------
 	-- theme changing functionality
-	local themeRect = display.newImageRect ( "assets/theme.png", 128, 128 )
-	themeRect:translate ( w - 110, 110 )
-	widgets.button ( themeRect, false, function ()
-		whichTheme = whichTheme == 1 and 2 or 1
-		widgets:setTheme ( theme.get ( whichTheme ) )
+	local themeIcon = display.newImageRect ( "assets/theme.png", 128, 128 )
+	themeIcon:translate ( w - 110, 110 )
+	widgets.button ( themeIcon, false, function ()
+		currentThemeIndex = currentThemeIndex == 1 and 2 or 1
+		widgets:setTheme ( theme.get ( currentThemeIndex ) )
 		widgets:refresh ()
-		settings.set ( "currentTheme", whichTheme )
+		settings.set ( "currentTheme", currentThemeIndex )
 	end )
 
 	Runtime:addEventListener ( "Vowal", check )

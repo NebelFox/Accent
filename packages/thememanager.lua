@@ -1,5 +1,5 @@
 local M = {}
-local io, sub, tonumber, remove, pairs, ipairs, system = io, string.sub, tonumber, table.remove, pairs, ipairs, system
+local io, sub, tonumber, pairs, ipairs, system = io, string.sub, tonumber, pairs, ipairs, system
 
 local path	= system.pathForFile ( "data/themes.json", system.ResourceDirectory )
 local data	= {}

@@ -15,7 +15,6 @@ local w, h = display.contentWidth, display.contentHeight
 function M:init ( group )
 	self.group = display.newGroup ()
 	self.font = native.newFont "assets/UbuntuMono-B.ttf"
-	-- self.subFont = native.newFont "scene/lib/texgyrecursor-bold.otf"
 	group:insert ( self.group )
 	
 	-- Implementing the background
@@ -33,7 +32,7 @@ function M:init ( group )
 		bg.index = #self.objects + 1
 		self.objects[bg.index] = bg
 		function bg:delete ()
-			display.delete ( bg )
+			display.remove ( bg )
 			M.objects[self.index] = nil
 		end
 	end
@@ -45,7 +44,7 @@ function M:init ( group )
 		local self = M
 		local t = self.currentTheme
 		local text = display.newText ( self.group, "", w - 5, h - 5, native.systemFont, 36 )
-		text.text = "(c) 2020 NebelHund, @nebelhund.ich"
+		text.text = "(c) 2021 NebelFox, @nebelfox"
 		text.anchorX, text.anchorY = 1, 1
 		function text:refresh ()
 			t = M.currentTheme
@@ -68,7 +67,7 @@ do
 		vowals[key] = true
 	end
 end
-function vowals:contain ( v )
+function vowals:contains ( v )
 	return self[v] ~= nil
 end
 
@@ -112,36 +111,29 @@ function M.word.new ( w )
 	local word = w.word
 
 	-- General information about received word
-	local isDouble = w.isDouble
-	local origAccent = w.accent
-	local accent
-	if isDouble then
-		accent = {}
-		for _, v in ipairs ( origAccent ) do
-			accent[v] = true
-		end
-		function accent:contain ( v )
+	local accents = {}
+	for _, v in ipairs (w.accents) do
+		accents[v] = true
+		function accents:contains (v)
 			return self[v] ~= nil
 		end
-	else accent = origAccent end
+	end
 
 	local vowalCount = 0
 	local width = config.width
 	local fsize, nsize, font = config.fsize, config.nsize, self.font
-	local answers = isDouble and 2 or 1	-- How much letters must the user choose
+	local answersCount = #w.accents
 
 	-- Creating each letter
 	for i=1, string.len ( word ) -1, 2 do
 
 		local l = {}
 		local letter = string.sub ( word, i, i + 1 )
-		l.isVowal = vowals:contain ( letter )
+		l.isVowal = vowals:contains ( letter )
 
-		-- Graphical experience
 		l.text = display.newText ( object.group, letter, x, 0, font, fsize )
 		l.text.anchorX = 0
 		object.letters[#object.letters + 1] = l
-		-- print ( "!> creating the letter:", letter )
 		object.group:insert ( l.text )
 		x = x + l.text.width + config.offset
 
@@ -153,7 +145,7 @@ function M.word.new ( w )
 
 		if l.isVowal then
 			vowalCount = vowalCount + 1
-			l.isAnswer = isDouble and accent:contain ( vowalCount ) or accent == vowalCount
+			l.isAnswer = accents:contains ( vowalCount )
 
 			l.rect = display.newRect ( object.group, l.text.x + l.text.width * 0.5, 0, l.text.width + config.offset, l.text.height * 1.2 )
 			l.rect:setFillColor ( 0, 0, 0, 0 )
@@ -161,34 +153,32 @@ function M.word.new ( w )
 			object.group:insert ( l.rect )
 
 			function l.rect:touch ( event )
-				if event.phase == "ended" then
-					if l.rect.isHitTestable then
-						if l.isAnswer then
-							if not l.isSelected then
-								answers = answers - 1
-								l.isSelected = true
-								l.text:setFillColor ( unpack ( t.textright ) )
-							else
-								l.isSelected = false
-								answers = answers + 1
-								l.text:setFillColor ( unpack ( t.highlight ) )
-							end
-
-							if answers == 0 then
-								object:setState ( false )
-								Runtime:dispatchEvent ( { name = "Vowal", right = true } )
-							end
-						else
+				if event.phase == "ended" and l.rect.isHitTestable then
+					if l.isAnswer then
+						if not l.isSelected then
+							answersCount = answersCount - 1
 							l.isSelected = true
-							l.text:setFillColor ( unpack ( t.textwrong ) )
-							l.timer = timer.performWithDelay ( 350, function ()
-								object:reset ()
-								l:refresh ()
-							end, 1 )
-							Runtime:dispatchEvent ( { name = "Vowal", right = false } )
+							l.text:setFillColor ( unpack ( t.textright ) )
+						else
+							l.isSelected = false
+							answers = answers + 1
+							l.text:setFillColor ( unpack ( t.highlight ) )
 						end
-						return true
+
+						if answersCount == 0 then
+							object:setState ( false )
+							Runtime:dispatchEvent ( { name = "Vowal", correct = true } )
+						end
+					else
+						l.isSelected = true
+						l.text:setFillColor ( unpack ( t.textwrong ) )
+						l.timer = timer.performWithDelay ( 350, function ()
+							object:reset ()
+							l:refresh ()
+						end, 1 )
+						Runtime:dispatchEvent ( { name = "Vowal", correct = false } )
 					end
+					return true
 				end
 			end
 			l.rect:addEventListener ( "touch" )
@@ -209,34 +199,34 @@ function M.word.new ( w )
 
 	end
 
-	-- Adding the notice if it exists
-	-- Notice is a child object so it has own refresh method
-	if w.notice then
+	-- Adding the hint if it exists
+	-- hint is a child object so it has own refresh method
+	if w.hint then
 
-		object.notice = display.newGroup ()
-		self.group:insert ( object.notice )
-		object.notice.x, object.notice.y = config.x, config.y - fsize * 0.8
+		object.hint = display.newGroup ()
+		self.group:insert ( object.hint )
+		object.hint.x, object.hint.y = config.x, config.y - fsize * 0.8
 
-		local notice = display.newText ( object.notice, w.notice, 0, 0, font, nsize )
-		notice.anchorY = 1
+		local hint = display.newText ( object.hint, w.hint, 0, 0, font, nsize )
+		hint.anchorY = 1
 
-		local width = notice.width * 0.4
-		local y = notice.height + 5
+		local width = hint.width * 0.4
+		local y = hint.height + 5
 		y = 5
 
-		local line = display.newLine ( object.notice, -width, y, width, y )
+		local line = display.newLine ( object.hint, -width, y, width, y )
 		line.strokeWidth = 4
 
-		function object.notice:refresh ()
-			notice:setFillColor ( unpack ( t.highlight ) )
+		function object.hint:refresh ()
+			hint:setFillColor ( unpack ( t.highlight ) )
 			line:setStrokeColor ( unpack ( t.highlight ) )
 		end
-		object.notice:refresh ()
+		object.hint:refresh ()
 
-		function object.notice:disappear ()
-			display.remove ( object.notice )
-			notice, line = nil, nil
-			object.notice = nil
+		function object.hint:disappear ()
+			display.remove ( object.hint )
+			hint, line = nil, nil
+			object.hint = nil
 		end
 
 	end
@@ -247,8 +237,8 @@ function M.word.new ( w )
 		for i=1, #self.letters do
 			self.letters[i]:refresh ()
 		end
-		if self.notice then
-			self.notice:refresh ()
+		if self.hint then
+			self.hint:refresh ()
 		end
 	end
 
@@ -263,21 +253,19 @@ function M.word.new ( w )
 			end
 			self.letters[i] = nil
 		end
-		if self.notice then
-			self.notice:disappear ()
+		if self.hint then
+			self.hint:disappear ()
 		end
 		M.objects[self.index] = nil
 	end
 
 	-- For returning to the starting version of word
 	function object:reset ()
-		answers = isDouble and 2 or 1
+		answers = #w.accents
 		for i=1, #self.letters do
 			local l = self.letters[i]
-			if l.isVowal then
-				if l.isSelected then
-					l.isSelected = false
-				end
+			if l.isVowal and l.isSelected then
+				l.isSelected = false
 			end
 		end
 	end
@@ -399,8 +387,8 @@ function M.progressView ( data )
 	globalGroup.anchorY = 0
 	globalGroup.y = 20
 
-	transition.from ( weekGroup, { time = 700, delay = 200, yScale = 0.01, y = -200 } )
-	transition.from ( globalGroup, { time = 700, delay = 200, yScale = 0.01, y = 200 } )
+	transition.from ( weekGroup, { time = 700, delay = 200, yScale = 0.000001, y = -200 } )
+	transition.from ( globalGroup, { time = 700, delay = 200, yScale = 0.000001, y = 200 } )
 
 	function object:refresh ()
 		t = M.currentTheme
